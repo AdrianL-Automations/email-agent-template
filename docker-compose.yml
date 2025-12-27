@@ -1,0 +1,74 @@
+services:
+  # ==========================================
+  # 1. THE BRAIN (Python AI)
+  # ==========================================
+  agent-core:
+    build: ./agent-core
+    container_name: agent-core
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./agent-core:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    networks:
+      - app-network
+
+  # ==========================================
+  # 2. THE MANAGER (Activepieces)
+  # ==========================================
+  activepieces:
+    image: activepieces/activepieces:latest
+    container_name: activepieces
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "8080:80"
+    environment:
+      # --- CONNECT TO DATABASE ---
+      - AP_POSTGRES_HOST=${AP_POSTGRES_HOST}
+      - AP_POSTGRES_PORT=5432
+      - AP_POSTGRES_DATABASE=postgres
+      - AP_POSTGRES_USERNAME=${AP_POSTGRES_USERNAME}
+      - AP_POSTGRES_PASSWORD=${AP_POSTGRES_PASSWORD}
+      - AP_POSTGRES_SSL=true
+      - AP_POSTGRES_SSL_REJECT_UNAUTHORIZED=false
+      
+      # --- SYSTEM SETTINGS ---
+      - AP_DB_TYPE=POSTGRES
+      - AP_EXECUTION_MODE=UNSANDBOXED
+      - AP_REDIS_URL=redis://redis:6379
+      - AP_SIGN_UP_ENABLED=false
+      - AP_JWT_SECRET=${AP_JWT_SECRET}
+      - AP_ENCRYPTION_KEY=${AP_ENCRYPTION_KEY}
+      - AP_TRIGGER_DEFAULT_POLL_INTERVAL=1
+      - AP_FRONTEND_URL=${AP_FRONTEND_URL}
+      - AP_WEBHOOK_URL=${AP_WEBHOOK_URL}
+      - AP_PIECES_SOURCE=CLOUD_AND_FILE
+                    
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  # ==========================================
+  # 3. THE HELPER (Redis Cache)
+  # ==========================================
+  redis:
+    image: redis:alpine
+    container_name: ap-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes  
+    volumes:                                
+      - ./redis_data:/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
